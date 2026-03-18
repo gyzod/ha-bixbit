@@ -1,9 +1,9 @@
 {
   "domain": "bixbit",
   "name": "Bixbit Miner",
-  "codeowners": [],
+  "codeowners": ["@gyzod"],
   "config_flow": true,
-  "documentation": "",
+  "documentation": "https://github.com/gyzod/ha-bixbit",
   "iot_class": "local_polling",
   "version": "1.0.0",
   "requirements": []

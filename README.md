@@ -1,8 +1,23 @@
-# Bixbit Miner – Home Assistant Integration
+<p align="center">
+  <img src="images/logo.png" alt="Bixbit Logo" width="150">
+</p>
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+<h1 align="center">Bixbit Miner – Home Assistant Integration</h1>
 
-Custom Home Assistant integration for **Bixbit** (WhatsMiner-based) ASIC miners. Communicates directly with the miner over TCP (port 4028) — no cloud, no extra dependencies.
+<p align="center">
+  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
+  <a href="https://github.com/gyzod/ha-bixbit/releases"><img src="https://img.shields.io/github/v/release/gyzod/ha-bixbit" alt="Release"></a>
+  <a href="https://github.com/gyzod/ha-bixbit/blob/main/LICENSE"><img src="https://img.shields.io/github/license/gyzod/ha-bixbit" alt="License"></a>
+</p>
+
+<p align="center">
+  Custom Home Assistant integration for <strong>Bixbit</strong> (WhatsMiner-based) ASIC miners.<br>
+  Communicates directly with the miner over TCP (port 4028) — no cloud, no extra dependencies.
+</p>
+
+---
+
+**Author:** [Gyzod](https://github.com/gyzod)
 
 ## Features
 
@@ -111,6 +126,10 @@ Should work with all WhatsMiner-based Bixbit miners that expose the TCP API on p
 ## API Documentation
 
 See [API.md](API.md) for the full API reference (converted from the official Word document).
+
+## Author
+
+Made with ❤️ by [Gyzod](https://github.com/gyzod)
 
 ## License
 
