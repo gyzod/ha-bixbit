@@ -206,3 +206,35 @@ def aes_ecb_decrypt(data: bytes, key: bytes) -> bytes:
     for i in range(0, len(data), 16):
         result.extend(_decrypt_block(data[i : i + 16], rk))
     return bytes(result)
+
+
+def aes_cbc_encrypt(data: bytes, key: bytes, iv: bytes = b'\x00' * 16) -> bytes:
+    """Encrypt data with AES-128-CBC."""
+    assert len(key) == 16
+    assert len(iv) == 16
+    assert len(data) % 16 == 0
+    rk = _key_expansion(key)
+    result = bytearray()
+    prev = iv
+    for i in range(0, len(data), 16):
+        block = bytes(a ^ b for a, b in zip(data[i : i + 16], prev))
+        enc = _encrypt_block(block, rk)
+        result.extend(enc)
+        prev = enc
+    return bytes(result)
+
+
+def aes_cbc_decrypt(data: bytes, key: bytes, iv: bytes = b'\x00' * 16) -> bytes:
+    """Decrypt data with AES-128-CBC."""
+    assert len(key) == 16
+    assert len(iv) == 16
+    assert len(data) % 16 == 0
+    rk = _key_expansion(key)
+    result = bytearray()
+    prev = iv
+    for i in range(0, len(data), 16):
+        block = data[i : i + 16]
+        dec = _decrypt_block(block, rk)
+        result.extend(bytes(a ^ b for a, b in zip(dec, prev)))
+        prev = block
+    return bytes(result)

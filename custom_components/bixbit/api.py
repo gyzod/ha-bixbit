@@ -32,20 +32,17 @@ class BixbitAuthError(BixbitApiError):
 
 
 def _aes_encrypt(data: bytes, key: bytes) -> bytes:
-    """AES-ECB encrypt with PKCS7 padding (no external dependency)."""
-    # PKCS7 padding
+    """AES-CBC encrypt with PKCS7 padding and zero IV."""
     pad_len = 16 - (len(data) % 16)
     data += bytes([pad_len] * pad_len)
-    # AES-ECB encrypt block by block
-    from .aes import aes_ecb_encrypt
-    return aes_ecb_encrypt(data, key)
+    from .aes import aes_cbc_encrypt
+    return aes_cbc_encrypt(data, key)
 
 
 def _aes_decrypt(data: bytes, key: bytes) -> bytes:
-    """AES-ECB decrypt with PKCS7 unpadding."""
-    from .aes import aes_ecb_decrypt
-    decrypted = aes_ecb_decrypt(data, key)
-    # Remove PKCS7 padding
+    """AES-CBC decrypt with PKCS7 unpadding and zero IV."""
+    from .aes import aes_cbc_decrypt
+    decrypted = aes_cbc_decrypt(data, key)
     pad_len = decrypted[-1]
     if 1 <= pad_len <= 16 and all(b == pad_len for b in decrypted[-pad_len:]):
         return decrypted[:-pad_len]
