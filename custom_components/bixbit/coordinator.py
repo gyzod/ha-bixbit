@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
@@ -60,10 +61,15 @@ class BixbitCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Fetch all data from the miner."""
         try:
             summary_raw = await self.api.get_summary()
+            await asyncio.sleep(0.5)
             fan_mode_raw = await self.api.get_fan_mode()
+            await asyncio.sleep(0.5)
             power_limit_raw = await self.api.get_user_power_limit()
+            await asyncio.sleep(0.5)
             power_status_raw = await self.api.get_power_status()
+            await asyncio.sleep(0.5)
             firmware_raw = await self.api.get_firmware_version()
+            await asyncio.sleep(0.5)
             liquid_cooling_raw = await self.api.get_liquid_cooling()
 
             return {

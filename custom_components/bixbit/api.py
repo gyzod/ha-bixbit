@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
 import json
 import logging
@@ -32,17 +31,17 @@ class BixbitAuthError(BixbitApiError):
 
 
 def _aes_encrypt(data: bytes, key: bytes) -> bytes:
-    """AES-CBC encrypt with PKCS7 padding and zero IV."""
+    """AES-ECB encrypt with PKCS7 padding."""
     pad_len = 16 - (len(data) % 16)
     data += bytes([pad_len] * pad_len)
-    from .aes import aes_cbc_encrypt
-    return aes_cbc_encrypt(data, key)
+    from .aes import aes_ecb_encrypt
+    return aes_ecb_encrypt(data, key)
 
 
 def _aes_decrypt(data: bytes, key: bytes) -> bytes:
-    """AES-CBC decrypt with PKCS7 unpadding and zero IV."""
-    from .aes import aes_cbc_decrypt
-    decrypted = aes_cbc_decrypt(data, key)
+    """AES-ECB decrypt with PKCS7 unpadding."""
+    from .aes import aes_ecb_decrypt
+    decrypted = aes_ecb_decrypt(data, key)
     pad_len = decrypted[-1]
     if 1 <= pad_len <= 16 and all(b == pad_len for b in decrypted[-pad_len:]):
         return decrypted[:-pad_len]
@@ -199,9 +198,9 @@ class BixbitApi:
 
                 plaintext = json.dumps(command).encode("utf-8")
                 encrypted = _aes_encrypt(plaintext, aes_key)
-                enc_b64 = base64.b64encode(encrypted).decode("ascii")
+                enc_hex = encrypted.hex()
 
-                enc_msg = json.dumps({"enc": 1, "data": enc_b64}) + "\n"
+                enc_msg = json.dumps({"enc": 1, "data": enc_hex}) + "\n"
                 resp = await self._send_raw(enc_msg)
 
                 if not isinstance(resp, dict):
@@ -220,7 +219,7 @@ class BixbitApi:
                 # Decrypt response if it's encrypted
                 if "data" in resp and "enc" in resp:
                     try:
-                        enc_data = base64.b64decode(resp["data"])
+                        enc_data = bytes.fromhex(resp["data"])
                         decrypted = _aes_decrypt(enc_data, aes_key)
                         return json.loads(decrypted.decode("utf-8"))
                     except Exception as err:
