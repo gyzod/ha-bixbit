@@ -56,6 +56,9 @@ class BixbitApi:
     """Async client for communicating with a Bixbit miner over TCP."""
 
     _AES_KEY_TTL = 25  # seconds – token is valid for 30s on the miner
+    _MAX_RETRIES = 3
+    _RETRY_DELAY = 1.5  # seconds between retries on "over max connect"
+    _CMD_DELAY = 1.0  # seconds between sequential commands
 
     def __init__(self, host: str, port: int, password: str = "admin") -> None:
         self._host = host
@@ -63,6 +66,7 @@ class BixbitApi:
         self._password = password
         self._aes_key: bytes | None = None
         self._aes_key_time: float = 0.0
+        self._lock = asyncio.Lock()
 
     @property
     def host(self) -> str:
@@ -74,6 +78,11 @@ class BixbitApi:
 
     async def _send_raw(self, message: str) -> Any:
         """Send a raw message string and return parsed JSON."""
+        async with self._lock:
+            return await self._send_raw_unlocked(message)
+
+    async def _send_raw_unlocked(self, message: str) -> Any:
+        """Send a raw message (must be called with _lock held)."""
         _LOGGER.debug("Sending to %s:%s: %s", self._host, self._port, message[:200])
 
         try:
@@ -128,12 +137,30 @@ class BixbitApi:
     async def _send_command(
         self, cmd: str, payload: dict[str, Any] | None = None
     ) -> Any:
-        """Send a read command (unencrypted)."""
+        """Send a read command (unencrypted) with retry on connection limit."""
         command: dict[str, Any] = {"cmd": cmd}
         if payload:
             command.update(payload)
         message = json.dumps(command) + "\n"
-        return await self._send_raw(message)
+        last_err: Exception | None = None
+        for attempt in range(self._MAX_RETRIES):
+            try:
+                resp = await self._send_raw(message)
+                # Check for "over max connect" in response
+                if isinstance(resp, dict):
+                    msg = resp.get("Msg", "")
+                    if isinstance(msg, str) and "over max connect" in msg:
+                        raise BixbitConnectionError(msg)
+                return resp
+            except BixbitConnectionError as err:
+                last_err = err
+                if attempt < self._MAX_RETRIES - 1:
+                    _LOGGER.debug(
+                        "Connection limited, retry %d/%d in %.1fs",
+                        attempt + 1, self._MAX_RETRIES, self._RETRY_DELAY,
+                    )
+                    await asyncio.sleep(self._RETRY_DELAY)
+        raise last_err  # type: ignore[misc]
 
     async def _get_aes_key(self) -> bytes:
         """Get an AES key, reusing a cached one if still valid."""
@@ -163,44 +190,59 @@ class BixbitApi:
     async def _send_write_command(
         self, cmd: str, payload: dict[str, Any] | None = None
     ) -> Any:
-        """Send a write command using AES-encrypted protocol."""
-        aes_key = await self._get_aes_key()
-
-        command: dict[str, Any] = {"cmd": cmd}
-        if payload:
-            command.update(payload)
-
-        plaintext = json.dumps(command).encode("utf-8")
-        encrypted = _aes_encrypt(plaintext, aes_key)
-        enc_b64 = base64.b64encode(encrypted).decode("ascii")
-
-        enc_msg = json.dumps({"enc": 1, "data": enc_b64}) + "\n"
-        resp = await self._send_raw(enc_msg)
-
-        if not isinstance(resp, dict):
-            raise BixbitCommandError(f"Unexpected response: {resp}")
-
-        # Check for token/enc errors
-        if resp.get("STATUS") == "E":
-            error_msg = resp.get("Msg", "")
-            if "enc" in str(error_msg).lower() or "token" in str(error_msg).lower():
-                self._aes_key = None  # invalidate cached key
-                raise BixbitAuthError(
-                    f"Authentication failed (wrong password?): {error_msg}"
-                )
-            raise BixbitCommandError(f"Command failed: {error_msg}")
-
-        # Decrypt response if it's encrypted
-        if "data" in resp and "enc" in resp:
+        """Send a write command using AES-encrypted protocol with retry."""
+        last_err: Exception | None = None
+        for attempt in range(self._MAX_RETRIES):
             try:
-                enc_data = base64.b64decode(resp["data"])
-                decrypted = _aes_decrypt(enc_data, aes_key)
-                return json.loads(decrypted.decode("utf-8"))
-            except Exception as err:
-                _LOGGER.warning("Could not decrypt response: %s", err)
+                aes_key = await self._get_aes_key()
+
+                command: dict[str, Any] = {"cmd": cmd}
+                if payload:
+                    command.update(payload)
+
+                plaintext = json.dumps(command).encode("utf-8")
+                encrypted = _aes_encrypt(plaintext, aes_key)
+                enc_b64 = base64.b64encode(encrypted).decode("ascii")
+
+                enc_msg = json.dumps({"enc": 1, "data": enc_b64}) + "\n"
+                resp = await self._send_raw(enc_msg)
+
+                if not isinstance(resp, dict):
+                    raise BixbitCommandError(f"Unexpected response: {resp}")
+
+                # Check for token/enc errors
+                if resp.get("STATUS") == "E":
+                    error_msg = resp.get("Msg", "")
+                    if "enc" in str(error_msg).lower() or "token" in str(error_msg).lower():
+                        self._aes_key = None
+                        raise BixbitAuthError(
+                            f"Authentication failed (wrong password?): {error_msg}"
+                        )
+                    raise BixbitCommandError(f"Command failed: {error_msg}")
+
+                # Decrypt response if it's encrypted
+                if "data" in resp and "enc" in resp:
+                    try:
+                        enc_data = base64.b64decode(resp["data"])
+                        decrypted = _aes_decrypt(enc_data, aes_key)
+                        return json.loads(decrypted.decode("utf-8"))
+                    except Exception as err:
+                        _LOGGER.warning("Could not decrypt response: %s", err)
+                        return resp
+
                 return resp
 
-        return resp
+            except (BixbitConnectionError, BixbitAuthError) as err:
+                last_err = err
+                self._aes_key = None  # force fresh token on retry
+                if attempt < self._MAX_RETRIES - 1:
+                    _LOGGER.debug(
+                        "Write cmd '%s' failed (%s), retry %d/%d in %.1fs",
+                        cmd, err, attempt + 1, self._MAX_RETRIES,
+                        self._RETRY_DELAY,
+                    )
+                    await asyncio.sleep(self._RETRY_DELAY)
+        raise last_err  # type: ignore[misc]
 
     def _check_status(self, response: Any) -> None:
         """Check if a command response indicates an error."""
@@ -538,12 +580,16 @@ class BixbitApi:
             voltage_target=voltage_target,
             soft_restart=soft_restart,
         )
+        await asyncio.sleep(self._CMD_DELAY)
         await self.set_fan_mode(
             fan_mode=str(fan_mode),
             manual_fan_speed_percent=manual_fan_speed_percent,
         )
+        await asyncio.sleep(self._CMD_DELAY)
         await self.set_boards_cool_fan_percent(boards_cool_fan_percent)
+        await asyncio.sleep(self._CMD_DELAY)
         await self.set_additional_psu(additional_psu)
+        await asyncio.sleep(self._CMD_DELAY)
         await self.set_liquid_cooling(liquid_cooling)
 
     async def test_connection(self) -> dict[str, Any]:
