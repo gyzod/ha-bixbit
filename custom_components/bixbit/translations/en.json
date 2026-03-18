@@ -72,7 +72,12 @@
       "reset_mac": { "name": "Reset MAC address" },
       "ams_uninstall": { "name": "Uninstall AMS" },
       "deep_power_on": { "name": "Deep power on" },
-      "deep_power_off": { "name": "Deep power off" }
+      "deep_power_off": { "name": "Deep power off" },
+      "overclock_low": { "name": "Overclock: Low" },
+      "overclock_medium": { "name": "Overclock: Medium" },
+      "overclock_medium_high": { "name": "Overclock: Medium-High" },
+      "overclock_high": { "name": "Overclock: High" },
+      "overclock_very_high": { "name": "Overclock: Very High" }
     }
   }
 }

@@ -510,6 +510,42 @@ class BixbitApi:
 
     # ─── Utility ────────────────────────────────────────────────────
 
+    async def apply_overclock_profile(
+        self,
+        *,
+        board_temp_target: int,
+        freq_target: int,
+        power_limit: int,
+        power_max: int,
+        voltage_limit: int,
+        voltage_min: int,
+        voltage_target: int,
+        fan_mode: int = 1,
+        manual_fan_speed_percent: int = 100,
+        boards_cool_fan_percent: int = 100,
+        additional_psu: bool = False,
+        liquid_cooling: bool = False,
+        soft_restart: bool = True,
+    ) -> None:
+        """Apply a full overclock profile using local API commands."""
+        await self.set_overclock_info(
+            board_temp_target=board_temp_target,
+            freq_target=freq_target,
+            power_limit=power_limit,
+            power_max=power_max,
+            voltage_limit=voltage_limit,
+            voltage_min=voltage_min,
+            voltage_target=voltage_target,
+            soft_restart=soft_restart,
+        )
+        await self.set_fan_mode(
+            fan_mode=str(fan_mode),
+            manual_fan_speed_percent=manual_fan_speed_percent,
+        )
+        await self.set_boards_cool_fan_percent(boards_cool_fan_percent)
+        await self.set_additional_psu(additional_psu)
+        await self.set_liquid_cooling(liquid_cooling)
+
     async def test_connection(self) -> dict[str, Any]:
         """Test connection by fetching firmware version."""
         return await self.get_firmware_version()

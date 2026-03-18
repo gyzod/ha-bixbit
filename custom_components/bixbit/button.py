@@ -93,6 +93,71 @@ BUTTON_DESCRIPTIONS: tuple[BixbitButtonEntityDescription, ...] = (
         icon="mdi:power-off",
         press_fn=lambda api: api.deep_power_off(),
     ),
+    BixbitButtonEntityDescription(
+        key="overclock_low",
+        translation_key="overclock_low",
+        icon="mdi:speedometer-slow",
+        press_fn=lambda api: api.apply_overclock_profile(
+            board_temp_target=80, freq_target=450,
+            power_limit=1300, power_max=1500,
+            voltage_limit=1200, voltage_min=1050, voltage_target=1179,
+            fan_mode=1, manual_fan_speed_percent=100,
+            boards_cool_fan_percent=100,
+            additional_psu=False, liquid_cooling=False,
+        ),
+    ),
+    BixbitButtonEntityDescription(
+        key="overclock_medium",
+        translation_key="overclock_medium",
+        icon="mdi:speedometer-medium",
+        press_fn=lambda api: api.apply_overclock_profile(
+            board_temp_target=80, freq_target=555,
+            power_limit=2000, power_max=2300,
+            voltage_limit=1300, voltage_min=1050, voltage_target=1190,
+            fan_mode=1, manual_fan_speed_percent=100,
+            boards_cool_fan_percent=100,
+            additional_psu=False, liquid_cooling=False,
+        ),
+    ),
+    BixbitButtonEntityDescription(
+        key="overclock_medium_high",
+        translation_key="overclock_medium_high",
+        icon="mdi:speedometer",
+        press_fn=lambda api: api.apply_overclock_profile(
+            board_temp_target=80, freq_target=555,
+            power_limit=2800, power_max=3000,
+            voltage_limit=1300, voltage_min=1050, voltage_target=1190,
+            fan_mode=1, manual_fan_speed_percent=100,
+            boards_cool_fan_percent=100,
+            additional_psu=False, liquid_cooling=False,
+        ),
+    ),
+    BixbitButtonEntityDescription(
+        key="overclock_high",
+        translation_key="overclock_high",
+        icon="mdi:speedometer",
+        press_fn=lambda api: api.apply_overclock_profile(
+            board_temp_target=80, freq_target=632,
+            power_limit=3300, power_max=3600,
+            voltage_limit=1420, voltage_min=1050, voltage_target=1190,
+            fan_mode=1, manual_fan_speed_percent=100,
+            boards_cool_fan_percent=100,
+            additional_psu=False, liquid_cooling=False,
+        ),
+    ),
+    BixbitButtonEntityDescription(
+        key="overclock_very_high",
+        translation_key="overclock_very_high",
+        icon="mdi:flash-alert",
+        press_fn=lambda api: api.apply_overclock_profile(
+            board_temp_target=82, freq_target=665,
+            power_limit=3600, power_max=3900,
+            voltage_limit=1450, voltage_min=1050, voltage_target=1190,
+            fan_mode=1, manual_fan_speed_percent=100,
+            boards_cool_fan_percent=100,
+            additional_psu=False, liquid_cooling=False,
+        ),
+    ),
 )
 
 
