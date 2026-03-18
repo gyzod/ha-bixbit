@@ -38,7 +38,6 @@ class BixbitConfigFlow(ConfigFlow, domain=DOMAIN):
             host = user_input[CONF_HOST]
             port = user_input.get(CONF_PORT, DEFAULT_PORT)
 
-            self._async_abort_if_unique_id_configured()
             await self.async_set_unique_id(f"{host}:{port}")
             self._abort_if_unique_id_configured()
 
@@ -51,6 +50,9 @@ class BixbitConfigFlow(ConfigFlow, domain=DOMAIN):
                 else:
                     fw_version = "unknown"
             except BixbitApiError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected error connecting to Bixbit miner")
                 errors["base"] = "cannot_connect"
             else:
                 return self.async_create_entry(
