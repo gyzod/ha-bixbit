@@ -7,6 +7,7 @@ import base64
 import hashlib
 import json
 import logging
+import time
 from typing import Any
 
 from .const import RECV_BUFFER_SIZE, SOCKET_TIMEOUT
@@ -54,10 +55,14 @@ def _aes_decrypt(data: bytes, key: bytes) -> bytes:
 class BixbitApi:
     """Async client for communicating with a Bixbit miner over TCP."""
 
+    _AES_KEY_TTL = 25  # seconds – token is valid for 30s on the miner
+
     def __init__(self, host: str, port: int, password: str = "admin") -> None:
         self._host = host
         self._port = port
         self._password = password
+        self._aes_key: bytes | None = None
+        self._aes_key_time: float = 0.0
 
     @property
     def host(self) -> str:
@@ -131,7 +136,11 @@ class BixbitApi:
         return await self._send_raw(message)
 
     async def _get_aes_key(self) -> bytes:
-        """Get a fresh AES key via the get_token handshake."""
+        """Get an AES key, reusing a cached one if still valid."""
+        now = time.monotonic()
+        if self._aes_key is not None and (now - self._aes_key_time) < self._AES_KEY_TTL:
+            return self._aes_key
+
         token_resp = await self._send_command("get_token")
         msg = token_resp.get("Msg", token_resp)
         if isinstance(msg, str):
@@ -147,7 +156,9 @@ class BixbitApi:
         step1 = hashlib.md5(
             (self._password + salt).encode()
         ).hexdigest()
-        return hashlib.md5((newsalt + step1).encode()).digest()
+        self._aes_key = hashlib.md5((newsalt + step1).encode()).digest()
+        self._aes_key_time = time.monotonic()
+        return self._aes_key
 
     async def _send_write_command(
         self, cmd: str, payload: dict[str, Any] | None = None
@@ -173,6 +184,7 @@ class BixbitApi:
         if resp.get("STATUS") == "E":
             error_msg = resp.get("Msg", "")
             if "enc" in str(error_msg).lower() or "token" in str(error_msg).lower():
+                self._aes_key = None  # invalidate cached key
                 raise BixbitAuthError(
                     f"Authentication failed (wrong password?): {error_msg}"
                 )
