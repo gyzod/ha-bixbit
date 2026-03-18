@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import hashlib
 import json
 import logging
@@ -30,22 +32,24 @@ class BixbitAuthError(BixbitApiError):
     """Authentication error."""
 
 
+def _null_pad(s: str) -> bytes:
+    """Pad string with null bytes to 16-byte boundary."""
+    while len(s) % 16 != 0:
+        s += "\x00"
+    return s.encode("utf-8")
+
+
 def _aes_encrypt(data: bytes, key: bytes) -> bytes:
-    """AES-ECB encrypt with PKCS7 padding."""
-    pad_len = 16 - (len(data) % 16)
-    data += bytes([pad_len] * pad_len)
+    """AES-ECB encrypt (data must already be padded to 16-byte blocks)."""
     from .aes import aes_ecb_encrypt
     return aes_ecb_encrypt(data, key)
 
 
 def _aes_decrypt(data: bytes, key: bytes) -> bytes:
-    """AES-ECB decrypt with PKCS7 unpadding."""
+    """AES-ECB decrypt and strip null-byte padding."""
     from .aes import aes_ecb_decrypt
     decrypted = aes_ecb_decrypt(data, key)
-    pad_len = decrypted[-1]
-    if 1 <= pad_len <= 16 and all(b == pad_len for b in decrypted[-pad_len:]):
-        return decrypted[:-pad_len]
-    return decrypted
+    return decrypted.split(b"\x00")[0]
 
 
 class BixbitApi:
@@ -61,6 +65,7 @@ class BixbitApi:
         self._port = port
         self._password = password
         self._aes_key: bytes | None = None
+        self._sign: str | None = None
         self._aes_key_time: float = 0.0
         self._lock = asyncio.Lock()
 
@@ -158,11 +163,22 @@ class BixbitApi:
                     await asyncio.sleep(self._RETRY_DELAY)
         raise last_err  # type: ignore[misc]
 
-    async def _get_aes_key(self) -> bytes:
-        """Get an AES key, reusing a cached one if still valid."""
+    async def _get_aes_key(self) -> tuple[bytes, str]:
+        """Get AES-256 key and sign token, reusing cached values if valid.
+
+        WhatsMiner key derivation (reference implementation):
+        1. pwd = md5_crypt(password, salt)   → $1$salt$hash
+        2. key = hash part of pwd
+        3. aes_key = unhexlify(sha256(key).hexdigest())  → 32 bytes (AES-256)
+        4. sign = md5_crypt(key + time, newsalt).split('$')[3]
+        """
         now = time.monotonic()
-        if self._aes_key is not None and (now - self._aes_key_time) < self._AES_KEY_TTL:
-            return self._aes_key
+        if (
+            self._aes_key is not None
+            and self._sign is not None
+            and (now - self._aes_key_time) < self._AES_KEY_TTL
+        ):
+            return self._aes_key, self._sign
 
         token_resp = await self._send_command("get_token")
         msg = token_resp.get("Msg", token_resp)
@@ -170,56 +186,80 @@ class BixbitApi:
             raise BixbitAuthError(f"Token error: {msg}")
         salt = msg.get("salt", "")
         newsalt = msg.get("newsalt", "")
+        time_val = msg.get("time", "")
         if not salt or not newsalt:
             raise BixbitAuthError("Missing salt in token response")
 
-        # WhatsMiner key derivation:
-        # step1 = MD5(password + salt).hexdigest()
-        # aes_key = MD5(newsalt + step1).digest()  (16 bytes)
-        step1 = hashlib.md5(
-            (self._password + salt).encode()
-        ).hexdigest()
-        self._aes_key = hashlib.md5((newsalt + step1).encode()).digest()
+        from .md5_crypt import md5_crypt
+
+        # Step 1: md5_crypt(password, salt) → extract hash
+        pwd_hash = md5_crypt(self._password, salt)
+        key = pwd_hash.split("$")[3]
+
+        # Step 2: SHA-256 of key → 32-byte AES key
+        aes_key_hex = hashlib.sha256(key.encode()).hexdigest()
+        self._aes_key = binascii.unhexlify(aes_key_hex.encode())
+
+        # Step 3: Derive the sign token
+        sign_hash = md5_crypt(key + time_val, newsalt)
+        self._sign = sign_hash.split("$")[3]
+
         self._aes_key_time = time.monotonic()
-        return self._aes_key
+        return self._aes_key, self._sign
 
     async def _send_write_command(
         self, cmd: str, payload: dict[str, Any] | None = None
     ) -> Any:
-        """Send a write command using AES-encrypted protocol with retry."""
+        """Send a write command using WhatsMiner AES-256-ECB encrypted protocol.
+
+        Protocol:
+        1. Get token (salt, newsalt, time) from miner
+        2. Derive AES-256 key and sign via md5_crypt + SHA-256
+        3. Build JSON command with 'token' field
+        4. Null-pad and encrypt with AES-256-ECB
+        5. Base64 encode and send as {"enc": 1, "data": "..."}
+        """
         last_err: Exception | None = None
         for attempt in range(self._MAX_RETRIES):
             try:
-                aes_key = await self._get_aes_key()
+                aes_key, sign = await self._get_aes_key()
 
-                command: dict[str, Any] = {"cmd": cmd}
+                command: dict[str, Any] = {"cmd": cmd, "token": sign}
                 if payload:
                     command.update(payload)
 
-                plaintext = json.dumps(command).encode("utf-8")
+                plaintext = _null_pad(json.dumps(command))
                 encrypted = _aes_encrypt(plaintext, aes_key)
-                enc_hex = encrypted.hex()
+                enc_b64 = base64.encodebytes(encrypted).decode().replace("\n", "")
 
-                enc_msg = json.dumps({"enc": 1, "data": enc_hex}) + "\n"
+                enc_msg = json.dumps({"enc": 1, "data": enc_b64})
                 resp = await self._send_raw(enc_msg)
 
                 if not isinstance(resp, dict):
                     raise BixbitCommandError(f"Unexpected response: {resp}")
 
-                # Check for token/enc errors
+                # Check for plain-text error responses
                 if resp.get("STATUS") == "E":
                     error_msg = resp.get("Msg", "")
                     if "enc" in str(error_msg).lower() or "token" in str(error_msg).lower():
                         self._aes_key = None
+                        self._sign = None
                         raise BixbitAuthError(
                             f"Authentication failed (wrong password?): {error_msg}"
                         )
                     raise BixbitCommandError(f"Command failed: {error_msg}")
 
-                # Decrypt response if it's encrypted
-                if "data" in resp and "enc" in resp:
+                # Decrypt encrypted response
+                if "enc" in resp:
                     try:
-                        enc_data = bytes.fromhex(resp["data"])
+                        enc_data = base64.b64decode(resp["enc"])
+                        decrypted = _aes_decrypt(enc_data, aes_key)
+                        return json.loads(decrypted.decode("utf-8"))
+                    except Exception:
+                        pass
+                if "data" in resp:
+                    try:
+                        enc_data = base64.b64decode(resp["data"])
                         decrypted = _aes_decrypt(enc_data, aes_key)
                         return json.loads(decrypted.decode("utf-8"))
                     except Exception as err:
@@ -230,7 +270,8 @@ class BixbitApi:
 
             except (BixbitConnectionError, BixbitAuthError) as err:
                 last_err = err
-                self._aes_key = None  # force fresh token on retry
+                self._aes_key = None
+                self._sign = None
                 if attempt < self._MAX_RETRIES - 1:
                     _LOGGER.debug(
                         "Write cmd '%s' failed (%s), retry %d/%d in %.1fs",

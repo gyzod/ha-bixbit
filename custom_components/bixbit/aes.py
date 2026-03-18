@@ -1,7 +1,7 @@
-"""Minimal pure-Python AES-128-ECB implementation for WhatsMiner token auth.
+"""Minimal pure-Python AES implementation for WhatsMiner token auth.
 
 This avoids adding 'cryptography' as a runtime dependency in Home Assistant.
-Only AES-128-ECB (16-byte key) is needed for the WhatsMiner write protocol.
+Supports AES-128-ECB (16-byte key) and AES-256-ECB (32-byte key).
 """
 
 from __future__ import annotations
@@ -68,8 +68,8 @@ def _mix_single(a: int, b: int) -> int:
 
 
 def _key_expansion(key: bytes) -> list[list[int]]:
-    nk = 4
-    nr = 10
+    nk = len(key) // 4  # 4 for AES-128, 8 for AES-256
+    nr = {4: 10, 8: 14}[nk]
     nb = 4
     w: list[list[int]] = []
     for i in range(nk):
@@ -80,6 +80,8 @@ def _key_expansion(key: bytes) -> list[list[int]]:
             temp = temp[1:] + temp[:1]
             temp = [_SBOX[b] for b in temp]
             temp[0] ^= _RCON[i // nk - 1]
+        elif nk == 8 and i % nk == 4:
+            temp = [_SBOX[b] for b in temp]
         w.append([w[i - nk][j] ^ temp[j] for j in range(4)])
     return w
 
@@ -144,20 +146,20 @@ def _inv_mix_columns(state: list[list[int]]) -> None:
         )
 
 
-def _encrypt_block(block: bytes, round_keys: list[list[int]]) -> bytes:
+def _encrypt_block(block: bytes, round_keys: list[list[int]], nr: int) -> bytes:
     state = [[0] * 4 for _ in range(4)]
     for r in range(4):
         for c in range(4):
             state[r][c] = block[c * 4 + r]
     _add_round_key(state, round_keys[0:4])
-    for rnd in range(1, 10):
+    for rnd in range(1, nr):
         _sub_bytes(state)
         _shift_rows(state)
         _mix_columns(state)
         _add_round_key(state, round_keys[rnd * 4 : rnd * 4 + 4])
     _sub_bytes(state)
     _shift_rows(state)
-    _add_round_key(state, round_keys[40:44])
+    _add_round_key(state, round_keys[nr * 4 : nr * 4 + 4])
     out = bytearray(16)
     for r in range(4):
         for c in range(4):
@@ -165,13 +167,13 @@ def _encrypt_block(block: bytes, round_keys: list[list[int]]) -> bytes:
     return bytes(out)
 
 
-def _decrypt_block(block: bytes, round_keys: list[list[int]]) -> bytes:
+def _decrypt_block(block: bytes, round_keys: list[list[int]], nr: int) -> bytes:
     state = [[0] * 4 for _ in range(4)]
     for r in range(4):
         for c in range(4):
             state[r][c] = block[c * 4 + r]
-    _add_round_key(state, round_keys[40:44])
-    for rnd in range(9, 0, -1):
+    _add_round_key(state, round_keys[nr * 4 : nr * 4 + 4])
+    for rnd in range(nr - 1, 0, -1):
         _inv_shift_rows(state)
         _inv_sub_bytes(state)
         _add_round_key(state, round_keys[rnd * 4 : rnd * 4 + 4])
@@ -187,54 +189,24 @@ def _decrypt_block(block: bytes, round_keys: list[list[int]]) -> bytes:
 
 
 def aes_ecb_encrypt(data: bytes, key: bytes) -> bytes:
-    """Encrypt data with AES-128-ECB. Data must be padded to 16-byte blocks."""
-    assert len(key) == 16
+    """Encrypt data with AES-ECB. Supports 16-byte (AES-128) or 32-byte (AES-256) keys."""
+    assert len(key) in (16, 32)
     assert len(data) % 16 == 0
+    nr = {16: 10, 32: 14}[len(key)]
     rk = _key_expansion(key)
     result = bytearray()
     for i in range(0, len(data), 16):
-        result.extend(_encrypt_block(data[i : i + 16], rk))
+        result.extend(_encrypt_block(data[i : i + 16], rk, nr))
     return bytes(result)
 
 
 def aes_ecb_decrypt(data: bytes, key: bytes) -> bytes:
-    """Decrypt data with AES-128-ECB."""
-    assert len(key) == 16
+    """Decrypt data with AES-ECB. Supports 16-byte (AES-128) or 32-byte (AES-256) keys."""
+    assert len(key) in (16, 32)
     assert len(data) % 16 == 0
+    nr = {16: 10, 32: 14}[len(key)]
     rk = _key_expansion(key)
     result = bytearray()
     for i in range(0, len(data), 16):
-        result.extend(_decrypt_block(data[i : i + 16], rk))
-    return bytes(result)
-
-
-def aes_cbc_encrypt(data: bytes, key: bytes, iv: bytes = b'\x00' * 16) -> bytes:
-    """Encrypt data with AES-128-CBC."""
-    assert len(key) == 16
-    assert len(iv) == 16
-    assert len(data) % 16 == 0
-    rk = _key_expansion(key)
-    result = bytearray()
-    prev = iv
-    for i in range(0, len(data), 16):
-        block = bytes(a ^ b for a, b in zip(data[i : i + 16], prev))
-        enc = _encrypt_block(block, rk)
-        result.extend(enc)
-        prev = enc
-    return bytes(result)
-
-
-def aes_cbc_decrypt(data: bytes, key: bytes, iv: bytes = b'\x00' * 16) -> bytes:
-    """Decrypt data with AES-128-CBC."""
-    assert len(key) == 16
-    assert len(iv) == 16
-    assert len(data) % 16 == 0
-    rk = _key_expansion(key)
-    result = bytearray()
-    prev = iv
-    for i in range(0, len(data), 16):
-        block = data[i : i + 16]
-        dec = _decrypt_block(block, rk)
-        result.extend(bytes(a ^ b for a, b in zip(dec, prev)))
-        prev = block
+        result.extend(_decrypt_block(data[i : i + 16], rk, nr))
     return bytes(result)
