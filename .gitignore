@@ -1,0 +1,8 @@
+*.docx
+venv/
+.venv/
+
+bixbit.sample.script.py
+
+__pycache__/
+requirements.txt

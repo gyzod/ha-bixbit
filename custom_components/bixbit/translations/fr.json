@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connexion au mineur Bixbit",
+        "description": "Entrez l'adresse IP et le port de votre mineur Bixbit.",
+        "data": {
+          "host": "Hôte",
+          "port": "Port",
+          "scan_interval": "Intervalle de mise à jour (secondes)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter au mineur. Vérifiez l'adresse IP et le port."
+    },
+    "abort": {
+      "already_configured": "Ce mineur est déjà configuré."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "hashrate_ghs": { "name": "Hashrate (5s)" },
+      "hashrate_avg": { "name": "Hashrate (moy.)" },
+      "factory_ghs": { "name": "Hashrate usine" },
+      "power_realtime": { "name": "Puissance (temps réel)" },
+      "temp_chip_protect": { "name": "Temp. protection puce" },
+      "temp_chip_target": { "name": "Temp. cible puce" },
+      "psu_temp0": { "name": "Temp. PSU 1" },
+      "psu_temp1": { "name": "Temp. PSU 2" },
+      "psu_vout": { "name": "Tension sortie PSU" },
+      "psu_iout": { "name": "Courant sortie PSU" },
+      "psu_vin0": { "name": "Tension entrée PSU" },
+      "psu_iin0": { "name": "Courant entrée PSU" },
+      "psu_fan_speed": { "name": "Vitesse ventilateur PSU" },
+      "psu_serial": { "name": "Numéro de série PSU" },
+      "psu_name": { "name": "Modèle PSU" },
+      "status": { "name": "Statut" },
+      "miner_type": { "name": "Type de mineur" },
+      "miner_memory_usage": { "name": "Utilisation mémoire" },
+      "firmware_version": { "name": "Version firmware" },
+      "custom_version": { "name": "Version personnalisée" },
+      "fan_mode_sensor": { "name": "Mode ventilateur" },
+      "manual_fan_speed": { "name": "Vitesse ventilateur manuelle" },
+      "power_mode_sensor": { "name": "Mode de puissance" },
+      "power_limit_sensor": { "name": "Limite de puissance" },
+      "suspended": { "name": "Suspendu" },
+      "deep_suspended": { "name": "Suspension profonde" },
+      "cool_mode": { "name": "Mode de refroidissement" }
+    },
+    "switch": {
+      "deep_power": { "name": "Alimentation minage" },
+      "liquid_cooling": { "name": "Refroidissement liquide" }
+    },
+    "number": {
+      "manual_fan_speed_control": { "name": "Vitesse ventilateur" },
+      "user_power_limit": { "name": "Limite de puissance" }
+    },
+    "select": {
+      "power_mode": { "name": "Mode de puissance" },
+      "fan_mode": { "name": "Mode ventilateur" }
+    },
+    "button": {
+      "delete_overclock": { "name": "Supprimer overclock" },
+      "reset_recovery_reboots": { "name": "Réinitialiser compteur récupération" },
+      "delete_upfreq_results": { "name": "Supprimer résultats autotune" },
+      "generate_profiles": { "name": "Générer les profils" },
+      "stop_profiles_generation": { "name": "Arrêter génération profils" },
+      "delete_generated_profiles": { "name": "Supprimer profils générés" },
+      "upgrade_psu_firmware": { "name": "Mettre à jour firmware PSU" },
+      "reset_mac": { "name": "Réinitialiser adresse MAC" },
+      "ams_uninstall": { "name": "Désinstaller AMS" },
+      "deep_power_on": { "name": "Allumage profond" },
+      "deep_power_off": { "name": "Extinction profonde" }
+    }
+  }
+}

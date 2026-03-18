@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Bixbit Miner",
+        "description": "Enter the IP address and port of your Bixbit miner.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "scan_interval": "Scan interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the miner. Verify the IP address and port."
+    },
+    "abort": {
+      "already_configured": "This miner is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "hashrate_ghs": { "name": "Hashrate (5s)" },
+      "hashrate_avg": { "name": "Hashrate (avg)" },
+      "factory_ghs": { "name": "Factory hashrate" },
+      "power_realtime": { "name": "Power (realtime)" },
+      "temp_chip_protect": { "name": "Chip temp protect" },
+      "temp_chip_target": { "name": "Chip temp target" },
+      "psu_temp0": { "name": "PSU temp 1" },
+      "psu_temp1": { "name": "PSU temp 2" },
+      "psu_vout": { "name": "PSU voltage out" },
+      "psu_iout": { "name": "PSU current out" },
+      "psu_vin0": { "name": "PSU voltage in" },
+      "psu_iin0": { "name": "PSU current in" },
+      "psu_fan_speed": { "name": "PSU fan speed" },
+      "psu_serial": { "name": "PSU serial number" },
+      "psu_name": { "name": "PSU model" },
+      "status": { "name": "Status" },
+      "miner_type": { "name": "Miner type" },
+      "miner_memory_usage": { "name": "Memory usage" },
+      "firmware_version": { "name": "Firmware version" },
+      "custom_version": { "name": "Custom version" },
+      "fan_mode_sensor": { "name": "Fan mode" },
+      "manual_fan_speed": { "name": "Manual fan speed" },
+      "power_mode_sensor": { "name": "Power mode" },
+      "power_limit_sensor": { "name": "Power limit" },
+      "suspended": { "name": "Suspended" },
+      "deep_suspended": { "name": "Deep suspended" },
+      "cool_mode": { "name": "Cooling mode" }
+    },
+    "switch": {
+      "deep_power": { "name": "Mining power" },
+      "liquid_cooling": { "name": "Liquid cooling" }
+    },
+    "number": {
+      "manual_fan_speed_control": { "name": "Fan speed" },
+      "user_power_limit": { "name": "Power limit" }
+    },
+    "select": {
+      "power_mode": { "name": "Power mode" },
+      "fan_mode": { "name": "Fan mode" }
+    },
+    "button": {
+      "delete_overclock": { "name": "Delete overclock" },
+      "reset_recovery_reboots": { "name": "Reset recovery reboots" },
+      "delete_upfreq_results": { "name": "Delete autotune results" },
+      "generate_profiles": { "name": "Generate profiles" },
+      "stop_profiles_generation": { "name": "Stop profile generation" },
+      "delete_generated_profiles": { "name": "Delete generated profiles" },
+      "upgrade_psu_firmware": { "name": "Upgrade PSU firmware" },
+      "reset_mac": { "name": "Reset MAC address" },
+      "ams_uninstall": { "name": "Uninstall AMS" },
+      "deep_power_on": { "name": "Deep power on" },
+      "deep_power_off": { "name": "Deep power off" }
+    }
+  }
+}

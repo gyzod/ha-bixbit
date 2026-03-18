@@ -1,0 +1,10 @@
+{
+  "domain": "bixbit",
+  "name": "Bixbit Miner",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "",
+  "iot_class": "local_polling",
+  "version": "1.0.0",
+  "requirements": []
+}
