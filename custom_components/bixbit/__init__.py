@@ -9,7 +9,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .api import BixbitApi
-from .const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL, DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_SCAN_INTERVAL, DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .coordinator import BixbitCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,6 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BixbitConfigEntry) -> bo
     api = BixbitApi(
         host=entry.data[CONF_HOST],
         port=entry.data.get(CONF_PORT, DEFAULT_PORT),
+        password=entry.data.get(CONF_PASSWORD, "admin"),
     )
     scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = BixbitCoordinator(hass, api, scan_interval)
